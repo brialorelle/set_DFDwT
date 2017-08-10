@@ -223,7 +223,7 @@ In order to replicate the planned contrasts that they performed, I ran a regress
 
 ```{r}
 
-codReport(Report_Type = 'pilot',
+codReport(Report_Type = 'joint',
           Article_ID = 'DFDwT', 
           Insufficient_Information_Errors = 0,
           Decision_Errors = 0, 
