@@ -1,0 +1,245 @@
+---
+title: "COD Reproducibility Report"
+output:
+  html_document:
+    toc: true
+    float: true
+---
+
+#### Article ID: DFDwT
+#### Pilot: Camilla Griffiths
+#### Co-pilot: Gustav Nilsonne
+#### Co-pilot 2: Bria Long
+#### Start date: 03/12/2017
+#### End date: 03/17/2017 
+
+-------
+
+#### Methods summary: 
+
+After excluding trials based on stated exclusion criteria (i.e. extreme reproduction intervals: >3SD from individual & grand mean), the analyses will include a 2X2 ANOVA testing the main and interaction effects of 'presence of agency' and 'physical effort' on the accuracy of interval replication between two events. Participants in this within-subjects experiment were either asked to press a button and then listen for a tone (agency) or to listen to an initial tone then a second tone (no agency) while holding a resistance band in their right hand that was either high or low resistance/physical effort. 
+
+I will also set contrasts to test the effects of each individual condition on the outcome of interval reproduction errors. These contrasts will entail comparing low vs. high physical effort and comparing agency vs. no agency conditions. 
+
+------
+
+#### Target outcomes: 
+
+
+"Trials with extreme reproduction errors were removed (0.48% of trials). Mean reproduction errors for each participant in each condition (see Fig. 3) were analysed using a 2 (“Presence of Agency”) × 2 (“Physical Effort”) ANOVA, revealing significant main effects of both of these factors: F(1, 34) = 54.54, p < 0.001, ηp2 = 0.62, and F(1, 34) = 14.43, p = 0.001, ηp2 = 0.3, respectively. These main effects were due to larger reproduction errors - more underestimation - in the “Agency” condition than the “No Agency” condition, (M = −322 ms, SD = 236 and M = −56 ms, SD = 265, respectively). This replicates the basic temporal binding effect ( Buehner and Humphreys, 2009; Haggard et al., 2002; Humphreys and Buehner, 2010 ; Poonian and Cunnington, 2013). There were larger reproduction errors in the “Low” effort compared with “High” effort conditions, M = -208 ms, SD = 230 and M = −170 ms, SD = 228, respectively. However, the critical interaction was non-significant, F(1, 34) = 2.12, p = 0.154, ηp2 = 0.06.
+
+Although the interaction – critical to our research question – was non-significant, we nevertheless performed two planned contrasts to investigate the nature of effects across “Presence of Agency” and “Physical Effort”. In the “Agency” condition, reproduction errors were significantly larger under “Low” than “High” effort, t(34) = 3.46, p = 0.001, dz = 0.589, while this effect was not significant in the “No Agency” condition, t(34) = 1.59, p = 0.122, dz = 0.27. Therefore, due to a non-significant interaction, the overall results do not support our hypothesis that reproduction errors in agency tasks would be reduced under greater physical effort." (from Howard et al, 2016 p.117)"
+
+------
+
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, warning=FALSE, message=FALSE)
+```
+
+## Step 1: Load packages
+
+```{r}
+library(tidyverse) # for data munging
+library(knitr) # for kable table formating
+library(haven) # import and export 'SPSS', 'Stata' and 'SAS' Files
+library(readxl) # import excel files
+library(CODreports) # custom report functions
+library(ez) # for anova
+```
+
+## Step 2: Load data
+
+I could not load the data as is into R because it was highly formatted with multiple tabs, headers and subheaders in Excel so I made the following changes in Excel in order to be able to import into R: 
+1. Copied just Experiment 1 data (only data of interest here) into a new Excel workbook
+2. Saved the new workbook as data_ManualClean
+3. Changed 'Participant ID' to PID 
+4. Changed condition variable labels so that it includes information about both conditions (to be able to get rid of double headers) 
+  - Agency | low effort --> A_lowE
+  - Agency | high effort --> A_highE
+  - No Agency | low effort --> NA_lowE
+  - No Agency | high effort --> NA_highE
+5. Changed condition variable names to reflect order of trials -
+  - Agency |1st half | low effort --> 1A_lowE
+  - Agency |1st half | high effort --> 1A_highE
+  - Agency |2nd half | low effort --> 2A_lowE
+  - Agency |2nd half | high effort --> 2A_highE
+  - No Agency |1st half | low effort --> 1NA_lowE
+  - No Agency |1st half | high effort --> 1NA_highE
+  - No Agency |2nd half | low effort --> 2NA_lowE
+  - No Agency |2nd half | high effort --> 2NA_highE
+6. Changed variable names to reflect pre- and post-task effort ratings -  again to be able to delete multiple headers and make variable names descriptive 
+  - low effort pre --> preE_low
+  - low effort post --> postE_low
+  - high effort pre --> preE_high
+  - high effort post --> preE_high
+7. Changed main DV variable name from 'Reproduction Error Differential' to 'RepError_D' 
+8. Changed 'Error Differential' variable name to 'Error_D'
+
+Co-pilot's note: Have not attempted to reproduce this step.
+
+```{r}
+expt1 <- read_csv("data/data_ManualClean.csv", 
+     col_types = cols(`Gender (1=female)` = col_factor(levels = c("Female", "Male"))))
+```
+
+## Step 3: Tidy data
+
+To reproduce analyses in the specified 2.2 results section, I will only be looking at the interval reproduction data in both conditions (effort & agency) - this means excluding the trial order variables as well as the manipulation check variables in this tidy dataframe. 
+
+```{r}
+expt1.tidy= expt1 %>%
+  select(PID, A_lowE:NA_highE) %>%
+  gather(title, rating, A_lowE:NA_highE) %>%
+  separate(title, c("agency", "effort"), sep="_")
+```
+
+## Step 4: Run analysis
+
+### Pre-processing
+
+As they did in their analysis, we'll remove trials that are >3SD from a participants' mean interval reproductions and to remove trials that are >3SD from the grand mean. 
+
+```{r}
+#filtering Ps trials that are >3SD from grand mean
+expt1.tidy= expt1.tidy %>%
+  mutate(zscore=scale(rating)) %>%
+  filter(zscore<3)
+  
+#filtering Ps trials that are >3SD from their individual means
+expt1.tidy= expt1.tidy %>%
+  group_by(PID)%>%
+  mutate(indiv_zscore=scale(rating)) %>%
+  filter(indiv_zscore<3)
+
+summary(expt1.tidy$zscore)
+```
+
+It looks like they might have done their exclusions prior to uploading their data - no trials appeared to be anywhere close to 3SD from the grand mean or individual means - the maximum zscore was 2.5, which is what leads me to believe they performed their exclusions before posting the data. 
+
+Therefore, there were no trials excluded in this replication analysis. 
+
+### Descriptive statistics
+
+```{r}
+## gather mean reproduction errors by agency condition
+agencyStats=expt1.tidy %>%
+  mutate(agency=as.factor(agency))%>%
+  group_by(agency) %>%
+  summarise(mean_agency= mean(rating), SD_agency=sd(rating))
+
+## compare agency mean and sd (rounded) vs. reported values
+# agent = 1
+compareValues(round(agencyStats$mean_agency[1],0),-322) # match
+compareValues(round(agencyStats$SD_agency[1],0),236) # minor error
+# non-agent = 2
+compareValues(round(agencyStats$mean_agency[2],0),-56) # match
+compareValues(round(agencyStats$SD_agency[2],0),265) # minor error
+
+## gather reproduction errors by effort condition 
+effortStats=expt1.tidy %>%
+  mutate(effort=as.factor(effort)) %>%
+  group_by(effort) %>%
+  summarise(mean_effort= mean(rating), SD_effort=sd(rating))
+
+## compare effort mean and sd (rounded) vs. reported values
+# high effort
+compareValues(round(effortStats$mean_effort[1],0),-170) # match
+compareValues(round(effortStats$SD_effort[1],0),228) # major error
+# low effort
+compareValues(round(effortStats$mean_effort[2],0),-208) # match
+compareValues(round(effortStats$SD_effort[2],0),230) # major error
+
+```
+
+Summary: There were a number of numerical errors in the descriptive statistics reported in the paper, namely in the reported standard deviation values for the mean agency and effort condition values (2 are minor numerical errors, and 2 are major numerical errors). Below is a summary of those differences. 
+
+1. Agency condition: M= -322ms, SD=239 (3pt difference from reported SD: 236)
+2. No Agency condition: M=-56ms, SD=266 (1pt difference from reported SD: 265)
+
+3. Low Effort condition: M=-208ms, SD=288 (58pt difference from reported SD:230)
+4. High Effort condition: M=-170ms, SD=283 (55pt difference from reported SD:228)
+
+Co-pilot's note: The data provided by the authors is not raw data per se, but are subject means already aggregated over different sets of trials. It is possible that these differneces in SD calculatings from aggregating data in different ways, but I could not check this.
+
+### Inferential statistics
+
+```{r}
+## 2x2 anova to test main effects and interaction of agency & effort conditions 
+expt1.tidy$agency=as.factor(expt1.tidy$agency)
+expt1.tidy$effort=as.factor(expt1.tidy$effort)
+expt1.tidy$PID=as.factor(expt1.tidy$PID)
+expt1.tidy$rating=as.double(expt1.tidy$rating)
+
+res1=ezANOVA(dv= .(rating), wid= .(PID), within= .(agency, effort), detailed=TRUE, data=data.frame(expt1.tidy)) # Note BL: had to convert to data frame.
+unlisted <- unlist(res1)
+
+aov_stats <- tibble(effect = c("agency", "effort", "agency:effort"),
+  F = c(as.double(unlisted["ANOVA.F2"]), as.double(unlisted["ANOVA.F3"]), as.double(unlisted["ANOVA.F4"])), 
+  p = c(as.double(unlisted["ANOVA.p2"]), as.double(unlisted["ANOVA.p3"]), as.double(unlisted["ANOVA.p4"])),
+  SSn = c(as.double(unlisted["ANOVA.SSn2"]), as.double(unlisted["ANOVA.SSn3"]), as.double(unlisted["ANOVA.SSn4"])),
+  SSd = c(as.double(unlisted["ANOVA.SSd2"]), as.double(unlisted["ANOVA.SSd3"]), as.double(unlisted["ANOVA.SSd4"]))) %>% 
+  mutate(partial_eta_squared = SSn / (SSn + SSd)) %>% 
+  select(-SSn, -SSd)
+
+aov_stats
+
+## Compare stats for main effects and interaction 
+# agency
+compareValues(reportedValue = 54.54, obtainedValue = aov_stats$F[1]) #agency main effect F statistic, minor error
+compareValues(reportedValue = 0.62, obtainedValue = aov_stats$partial_eta_squared[1]) #agency main effect partial eta squared, match
+# agency p-value: MATCH (fits within reported interval)
+
+# effort
+compareValues(reportedValue = 14.43, obtainedValue = aov_stats$F[2]) #effort main effect F statistic, match
+compareValues(reportedValue = 0.3, obtainedValue = aov_stats$partial_eta_squared[2]) #effort main effect partial eta squared, match
+compareValues(reportedValue = 0.001, obtainedValue = aov_stats$p[2], isP = T) #effort main effect partial eta squared, match
+
+# interaction
+compareValues(reportedValue = 2.12, obtainedValue = aov_stats$F[3]) #effort*agency interaction F statistic, match
+compareValues(reportedValue = 0.06, obtainedValue = aov_stats$partial_eta_squared[3]) #effort*agency interaction partial eta squared, match 
+compareValues(reportedValue = 0.154, obtainedValue = aov_stats$p[3], isP = T) #effort*agency interaction partial eta squared, match
+
+```
+
+Summary: For their main analysis to test their hypothesis, they ran a 2X2 anova testing the main effects and interaction of effort and agency conditions on the interval reproduction errors outcome variable. Replication of these anayleses yielded the same exact statistics reported in section 2.2 of their results section for experiment 1. There was one minor numerical errors in these findings. 
+
+From the paper: 
+> "Although the interaction – critical to our research question – was non-significant, we nevertheless performed two planned contrasts to investigate the nature of effects across ‘‘Presence of Agency” and ‘‘Physical Effort”. In the ‘‘Agency” condition, reproduction errors were significantly larger under ‘‘Low” than ‘‘High” effort, t(34) = 3.46, p = 0.001, dz = 0.589, while this effect was not significant in the ‘‘No Agency” condition, t(34) = 1.59, p = 0.122, dz = 0.27."
+
+```{r planned contrasts}
+ttest1 <- t.test(expt1$A_lowE, expt1$A_highE, paired = T)
+ttest2 <- t.test(expt1$NA_lowE, expt1$NA_highE, paired = T)
+
+compareValues(reportedValue = -3.46, obtainedValue = ttest1$statistic) # match
+compareValues(reportedValue = 1.59, obtainedValue = ttest2$statistic) # wrong sign - major error.
+
+# Calculate dz
+dz1 <- mean(expt1$A_lowE - expt1$A_highE) / sd(expt1$A_lowE - expt1$A_highE)
+dz2 <- mean(expt1$NA_lowE - expt1$NA_highE) / sd(expt1$NA_lowE - expt1$NA_highE)
+
+compareValues(reportedValue = 0.589, obtainedValue = abs(dz1)) # minor error
+compareValues(reportedValue = 0.27, obtainedValue = abs(dz2)) # match
+
+```
+Summary: one major error reporting a t-value (reversed sign), one minor error reporting cohen's D.
+
+## Step 5: Conclusion
+
+```{r}
+
+codReport(Report_Type = 'joint',
+          Article_ID = 'DFDwT', 
+          Insufficient_Information_Errors = 0,
+          Decision_Errors = 0, 
+          Major_Numerical_Errors = 3, 
+          Minor_Numerical_Errors = 4)
+```
+
+
+This reproducibility check appears to be a success in terms of the main findings and statistics being reproduced, but there were a few significant numerical errors that might technically classify the reproduction a failure. Namely, the standard deviation numbers for the mean interval reproduction errors for effort and agency conditions were off in the order of the hundreds. Moreover, there was a t-statistic reported with the opposite sign (positive instead of negative) than what was yielded in this check. Otherwise, I was able to reproduce the main 2x2 anova analyses, which yielded two significant main effects of agency and effort conditions but no significant interaction effect. The failure to yield a significant interaction effect meant that the authors were unable to support their hypothesis that reproduction errors in agency tasks would be reduced under greater physical effort. 
+
+
+```{r session_info, include=TRUE, echo=TRUE, results='markup'}
+devtools::session_info()
+```
